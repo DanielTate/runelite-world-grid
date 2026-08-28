@@ -1242,3 +1242,49 @@ entirely — which is backwards, since the readout is the cheapest and most usef
   adds a fourth thing to configure for a question already answered.
 - D10 still applies to the readout independently — in an instance it shows `—`, whatever
   the render toggles say.
+
+---
+
+## D27. Label thresholds close the remaining rendering questions
+
+**Decision: scene labels are bounded by a line budget, world map labels by a zoom
+threshold. Both are single constants, tuned in-game.** This resolves O5 and O6.
+
+```
+scene:      24 boundary lines per axis        (draws closer in when a small
+                                               grid size would exceed it)
+world map:   3 pixels per cell -> draw lines
+            30 pixels per cell -> draw labels
+```
+
+**Rationale.** O5 and O6 both asked "at what point does this become unreadable", which is
+a question about pixels on a screen rather than about design. Picking a starting value and
+making it trivial to change beats leaving the question open, because neither can be
+answered without looking at it in-game — and once you are looking, changing a constant is
+the cheapest possible fix.
+
+**Consequences**
+
+- **These are safe starting values, not measured ones.** They were chosen to err toward
+  drawing too little rather than too much. Expect to tune them after the first session.
+- **The scene budget is a correctness matter, not only taste.** `render()` runs every
+  frame, and without a cap a grid size of 1 asks for over twenty thousand projections per
+  frame. The constant is what keeps the overlay off the frame-rate budget.
+- The world map keeps two separate thresholds because labels need far more room than
+  lines, and showing many cells' references at once is the point of the map.
+
+**Also closed by the build**
+
+- **O7 — row-letter direction: confirmed.** Letters encode rows, numbers encode columns.
+  Five landmarks reproduce exactly under this reading and no other. Pinned by tests.
+- **O21 — parser grammar: implemented and tested.** Case-insensitive, tolerates spaces,
+  accepts the plane suffix, rejects malformed input, column zero, planes outside 1-3 and
+  references outside the world. Round-trip with the formatter is pinned by a property
+  test across the world at six grid sizes.
+- **O2 — grid size mismatch: accepted, unmitigated.** Two players on 63 and 64 disagree
+  silently and nothing in the code can detect it. D15 removes the risk from saved files;
+  spoken references remain exposed. Revisit only if it bites.
+- **O4 — underground marker: accepted.** D4's decline stands; no `~` prefix.
+- **O9 — plugin name: a pre-submission task.** "World Grid" is the working name. Checking
+  the hub for collisions needs a GitHub account and a plugin-hub PR, which is a manual
+  step regardless.
