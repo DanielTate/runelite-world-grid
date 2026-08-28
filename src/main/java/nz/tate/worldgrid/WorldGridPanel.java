@@ -45,6 +45,7 @@ public class WorldGridPanel extends PluginPanel
 	private final ClientThread clientThread;
 	private final WorldGridConfig config;
 	private final LocationRepository repository;
+	private final ImportExport importExport;
 
 	private final JPanel listPanel = new JPanel(new GridLayout(0, 1, 0, 5));
 	private final JCheckBox selectAll = new JCheckBox("Select all");
@@ -58,12 +59,13 @@ public class WorldGridPanel extends PluginPanel
 
 	@Inject
 	WorldGridPanel(Client client, ClientThread clientThread, WorldGridConfig config,
-		LocationRepository repository)
+		LocationRepository repository, ImportExport importExport)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
 		this.config = config;
 		this.repository = repository;
+		this.importExport = importExport;
 
 		setLayout(new BorderLayout(0, 10));
 		setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -105,6 +107,23 @@ public class WorldGridPanel extends PluginPanel
 		deleteSelected.setFocusPainted(false);
 		deleteSelected.addActionListener(event -> deleteSelected());
 		header.add(deleteSelected);
+
+		JPanel transfer = new JPanel(new GridLayout(1, 2, 5, 0));
+		transfer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+		JButton importButton = new JButton("Import");
+		importButton.setFocusPainted(false);
+		importButton.addActionListener(event ->
+			importExport.startImport(this, this::clearSelection));
+		transfer.add(importButton);
+
+		JButton exportButton = new JButton("Export");
+		exportButton.setFocusPainted(false);
+		exportButton.addActionListener(event ->
+			importExport.export(this, repository.getLocations()));
+		transfer.add(exportButton);
+
+		header.add(transfer);
 
 		return header;
 	}
@@ -275,6 +294,11 @@ public class WorldGridPanel extends PluginPanel
 	/** Selection is view state only, so closing the panel forgets it. */
 	@Override
 	public void onDeactivate()
+	{
+		clearSelection();
+	}
+
+	private void clearSelection()
 	{
 		selectedKeys = new LinkedHashSet<>();
 		rebuild();

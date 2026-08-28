@@ -83,6 +83,18 @@ public interface WorldGridConfig extends Config
 		return true;
 	}
 
+	/** Remembered so an exported file lands where the last one did. Not user-facing. */
+	@ConfigItem(
+		keyName = "lastFileDirectory",
+		name = "Last import/export folder",
+		description = "Remembered folder for import and export.",
+		hidden = true
+	)
+	default String lastFileDirectory()
+	{
+		return "";
+	}
+
 	@Alpha
 	@ConfigItem(
 		keyName = "gridColour",
