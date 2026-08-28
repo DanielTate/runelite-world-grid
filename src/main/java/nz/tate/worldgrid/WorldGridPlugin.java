@@ -48,6 +48,9 @@ public class WorldGridPlugin extends Plugin
 	@Inject
 	private WorldMapGridOverlay worldMapGridOverlay;
 
+	@Inject
+	private LocationRepository locationRepository;
+
 	@Provides
 	WorldGridConfig provideConfig(ConfigManager configManager)
 	{
@@ -60,6 +63,7 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.add(hudOverlay);
 		overlayManager.add(sceneGridOverlay);
 		overlayManager.add(worldMapGridOverlay);
+		locationRepository.startUp();
 		log.debug("World Grid started");
 	}
 
@@ -69,6 +73,7 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.remove(hudOverlay);
 		overlayManager.remove(sceneGridOverlay);
 		overlayManager.remove(worldMapGridOverlay);
+		locationRepository.shutDown();
 		log.debug("World Grid stopped");
 	}
 
