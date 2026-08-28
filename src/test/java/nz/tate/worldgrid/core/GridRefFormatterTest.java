@@ -8,12 +8,11 @@ import static org.junit.Assert.assertNull;
 public class GridRefFormatterTest
 {
 	@Test
-	public void lumbridgeIsL35AtSize64()
+	public void lumbridgeIsW39AtSize64()
 	{
-		// The sample documented during scoping. If this fails the anchor has moved,
-		// which renames every square in the world.
+		// If this fails the anchor has moved, which renames every square in the world.
 		GridCell cell = GridMath.toCell(3222, 3218, 0, 64);
-		assertEquals("L35", GridRefFormatter.format(cell));
+		assertEquals("W39", GridRefFormatter.format(cell));
 	}
 
 	@Test
@@ -24,9 +23,9 @@ public class GridRefFormatterTest
 		GridCell north = GridMath.toCell(3222, 3218 + 64, 0, 64);
 		GridCell east = GridMath.toCell(3222 + 64, 3218, 0, 64);
 
-		assertEquals("L35", GridRefFormatter.format(south));
-		assertEquals("M35", GridRefFormatter.format(north));
-		assertEquals("L36", GridRefFormatter.format(east));
+		assertEquals("W39", GridRefFormatter.format(south));
+		assertEquals("X39", GridRefFormatter.format(north));
+		assertEquals("W40", GridRefFormatter.format(east));
 	}
 
 	@Test

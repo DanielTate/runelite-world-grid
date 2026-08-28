@@ -2,18 +2,15 @@ package nz.tate.worldgrid.core;
 
 import org.junit.Test;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Pins the landmark references documented during scoping.
+ * Pins landmark references against the anchor.
  *
- * <p>These are the tripwire for the anchor. Changing GridAnchor renames every square in
- * the world and invalidates every reference anyone has saved or written down, so it must
- * never happen by accident -- these assertions are what turn that into a loud failure.
- *
- * <p>Only landmarks whose world coordinate has been cross-checked appear here. The
- * remaining documented samples are listed in RISKS.md until their coordinates are
- * confirmed.
+ * <p>These are the tripwire. Changing GridAnchor renames every square in the world and
+ * invalidates every reference anyone has saved or written down, so it must never happen
+ * by accident -- these assertions turn that into a loud failure.
  */
 public class LandmarkReferenceTest
 {
@@ -27,42 +24,61 @@ public class LandmarkReferenceTest
 	@Test
 	public void lumbridge()
 	{
-		assertReference("L35", 3222, 3218);
+		assertReference("W39", 3222, 3218);
 	}
 
 	@Test
 	public void varrockSquare()
 	{
-		assertReference("O35", 3213, 3428);
+		assertReference("Z39", 3213, 3428);
 	}
 
 	@Test
 	public void grandExchange()
 	{
-		assertReference("P34", 3165, 3489);
+		assertReference("AA38", 3165, 3489);
 	}
 
 	@Test
 	public void falador()
 	{
-		assertReference("N31", 2965, 3380);
+		assertReference("Y35", 2965, 3380);
 	}
 
 	@Test
 	public void edgeville()
 	{
-		assertReference("P33", 3087, 3500);
+		assertReference("AA37", 3087, 3500);
 	}
 
 	@Test
-	public void theGridCoversTheOverworldInSingleLetters()
+	public void kourendCastle()
 	{
-		// 26 rows of 64 tiles reach exactly OVERWORLD_MAX_Y, which is why every surface
-		// reference fits in one letter. Losing that property means the anchor is wrong.
-		int northEdge = GridAnchor.ANCHOR_Y + 26 * SIZE;
-		assertEquals(4160, northEdge);
+		assertReference("AD14", 1628, 3673);
+	}
 
-		assertEquals("Z1", GridRefFormatter.format(
-			GridMath.toCell(GridAnchor.ANCHOR_X, northEdge - 1, 0, SIZE)));
+	@Test
+	public void southernSailingContentIsNameable()
+	{
+		// Sailing pushed the surface south of the old anchor, which made these points
+		// produce a negative row index -- unrepresentable, so literally unnameable.
+		assertReference("H29", 2567, 2295);
+		assertReference("G41", 3357, 2203);
+	}
+
+	@Test
+	public void theSouthWestMostSurfaceSquareIsInsideTheGrid()
+	{
+		GridCell corner = GridMath.toCell(960, 2048, 0, SIZE);
+		assertFalse(corner.isNegative());
+		assertReference("E4", 960, 2048);
+	}
+
+	@Test
+	public void theNorthernOceanBandIsInsideTheGrid()
+	{
+		// The surface now reaches y=4223, above Constants.OVERWORLD_MAX_Y (4160). That
+		// constant is stale, so the plugin never uses it as a bound.
+		assertFalse(GridMath.toCell(3000, 4223, 0, SIZE).isNegative());
 	}
 }

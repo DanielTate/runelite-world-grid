@@ -7,16 +7,21 @@ package nz.tate.worldgrid.core;
  * computed relative to it, so moving the anchor renames every square in the world and
  * invalidates every reference a player has saved, shared or written down.
  *
- * <p>Both coordinates are region-aligned (multiples of 64) and sit south-west of all
- * playable overworld surface, so no real location produces a negative index.
+ * <p>The anchor sits south-west of all playable surface with room to spare. The map has
+ * expanded south-west three times in a decade -- Zeah in 2016, Varlamore in 2024, and
+ * Sailing's oceans in 2025 -- and each expansion moved the true corner. A margin is the
+ * only defence available, because the constant cannot be corrected afterwards.
+ *
+ * <p>Both coordinates are divisible by 256, so grid lines coincide with region
+ * boundaries at every power-of-two grid size the config offers.
  */
 public final class GridAnchor
 {
-	/** West edge of the grid. 1024 = region column 16. */
-	public static final int ANCHOR_X = 1024;
+	/** West edge of the grid. 768 = region column 12, three regions west of the map. */
+	public static final int ANCHOR_X = 768;
 
-	/** South edge of the grid. 2496 = region row 39. */
-	public static final int ANCHOR_Y = 2496;
+	/** South edge of the grid. 1792 = region row 28, four regions south of the map. */
+	public static final int ANCHOR_Y = 1792;
 
 	/** Highest valid world coordinate on either axis. The space is 16384 x 16384. */
 	public static final int WORLD_MAX = 16383;

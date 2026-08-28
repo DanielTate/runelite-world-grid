@@ -9,12 +9,12 @@ import static org.junit.Assert.assertTrue;
 public class GridMathTest
 {
 	@Test
-	public void anchorIsRegionAligned()
+	public void anchorAlignsWithRegionsAtEveryPowerOfTwoSize()
 	{
-		// A region is 64 tiles. An anchor off that boundary would make the grid
-		// disagree with every other coordinate tool players use.
-		assertEquals(0, GridAnchor.ANCHOR_X % 64);
-		assertEquals(0, GridAnchor.ANCHOR_Y % 64);
+		// A region is 64 tiles. Divisibility by 256 means grid lines land on region
+		// boundaries at every power-of-two size the config offers, not just at 64.
+		assertEquals(0, GridAnchor.ANCHOR_X % 256);
+		assertEquals(0, GridAnchor.ANCHOR_Y % 256);
 	}
 
 	@Test
