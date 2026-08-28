@@ -4,6 +4,7 @@ import java.awt.Rectangle;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -14,6 +15,7 @@ import net.runelite.api.events.MenuOpened;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.worldmap.WorldMap;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.ui.JagexColors;
@@ -23,6 +25,7 @@ import nz.tate.worldgrid.core.GridCell;
 import nz.tate.worldgrid.core.GridMath;
 import nz.tate.worldgrid.core.GridRefParseResult;
 import nz.tate.worldgrid.core.GridRefParser;
+import nz.tate.worldgrid.core.SavedLocation;
 
 /**
  * "Search grid ref" on the world map's right-click menu.
@@ -34,8 +37,9 @@ import nz.tate.worldgrid.core.GridRefParser;
  * rather than adding another, so "Remove pin" is never ambiguous and a session of
  * searching does not litter the map.
  *
- * <p>Everything here runs on the client thread, both the menu callback and the chatbox
- * prompt, so nothing needs marshalling.
+ * <p>The menu callbacks and the chatbox prompt both run on the client thread. Only
+ * saving crosses over: the list is edited on the Swing thread, and the confirmation
+ * comes back to chat through {@link ClientThread}.
  */
 @Slf4j
 @Singleton
@@ -43,22 +47,29 @@ public class GridSearch
 {
 	private static final String SEARCH_OPTION = "Search";
 	private static final String SEARCH_TARGET = "grid ref";
+	private static final String SAVE_OPTION = "Save location";
+	private static final String REMOVE_OPTION = "Remove pin";
 
 	private final Client client;
 	private final ChatboxPanelManager chatboxPanelManager;
 	private final WorldMapPointManager worldMapPointManager;
 	private final WorldGridConfig config;
+	private final LocationRepository repository;
+	private final ClientThread clientThread;
 
 	private SearchMapPoint searchPin;
 
 	@Inject
 	GridSearch(Client client, ChatboxPanelManager chatboxPanelManager,
-		WorldMapPointManager worldMapPointManager, WorldGridConfig config)
+		WorldMapPointManager worldMapPointManager, WorldGridConfig config,
+		LocationRepository repository, ClientThread clientThread)
 	{
 		this.client = client;
 		this.chatboxPanelManager = chatboxPanelManager;
 		this.worldMapPointManager = worldMapPointManager;
 		this.config = config;
+		this.repository = repository;
+		this.clientThread = clientThread;
 	}
 
 	public void shutDown()
@@ -74,11 +85,34 @@ public class GridSearch
 			return;
 		}
 
+		if (searchPin != null)
+		{
+			// Offered on the map rather than only on the pin itself, so a pin that has
+			// snapped to the edge of the view is still reachable.
+			final SearchMapPoint pin = searchPin;
+			client.createMenuEntry(-1)
+				.setOption(REMOVE_OPTION)
+				.setTarget(target(pin.getName()))
+				.setType(MenuAction.RUNELITE)
+				.onClick(entry -> removePin());
+
+			client.createMenuEntry(-1)
+				.setOption(SAVE_OPTION)
+				.setTarget(target(pin.getName()))
+				.setType(MenuAction.RUNELITE)
+				.onClick(entry -> promptForName(pin.getWorldPoint()));
+		}
+
 		client.createMenuEntry(-1)
 			.setOption(SEARCH_OPTION)
-			.setTarget(ColorUtil.wrapWithColorTag(SEARCH_TARGET, JagexColors.MENU_TARGET))
+			.setTarget(target(SEARCH_TARGET))
 			.setType(MenuAction.RUNELITE)
 			.onClick(entry -> openPrompt());
+	}
+
+	private static String target(String text)
+	{
+		return ColorUtil.wrapWithColorTag(text, JagexColors.MENU_TARGET);
 	}
 
 	private boolean isMouseOverWorldMap()
@@ -142,6 +176,62 @@ public class GridSearch
 		searchPin.setJumpOnClick(true);
 		searchPin.setSnapToEdge(true);
 		worldMapPointManager.add(searchPin);
+	}
+
+	private void removePin()
+	{
+		worldMapPointManager.removeIf(point -> point instanceof SearchMapPoint);
+		searchPin = null;
+	}
+
+	/**
+	 * Promotes a searched reference into the saved list. Without this the only route to
+	 * a saved entry would be to travel to the place and press save, which defeats the
+	 * point of searching for somewhere you are not.
+	 */
+	private void promptForName(WorldPoint point)
+	{
+		Consumer<String> onDone = typed -> saveSearched(typed, point);
+		chatboxPanelManager.openTextInput("Name:")
+			.addCharValidator(typed -> typed >= ' ' && typed <= '~')
+			.onDone(onDone)
+			.build();
+	}
+
+	private void saveSearched(String typed, WorldPoint point)
+	{
+		String label = LocationEdits.cleanLabel(typed);
+		if (label == null)
+		{
+			message("A location needs a name.");
+			return;
+		}
+
+		// Saving from a search stores the square's centre tile, which is coarser than
+		// save-current-location's exact tile. Both are valid places.
+		SavedLocation saved = new SavedLocation(
+			label, point.getX(), point.getY(), point.getPlane(), false);
+
+		// The repository is edited from the Swing thread; the file write is its own job.
+		SwingUtilities.invokeLater(() ->
+		{
+			if (LocationEdits.containsKey(repository.getLocations(),
+				LocationEdits.placeKey(saved)))
+			{
+				report("That square is already saved.");
+				return;
+			}
+
+			repository.replaceAll(
+				LocationEdits.withAdded(repository.getLocations(), saved), false);
+			report("Saved " + label + ".");
+		});
+	}
+
+	/** Chat messages belong to the client thread, and this is called from Swing. */
+	private void report(String text)
+	{
+		clientThread.invoke(() -> message(text));
 	}
 
 	private void message(String text)
