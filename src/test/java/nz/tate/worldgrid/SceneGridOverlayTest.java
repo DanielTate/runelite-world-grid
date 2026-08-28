@@ -1,5 +1,7 @@
 package nz.tate.worldgrid;
 
+import nz.tate.worldgrid.core.GridCell;
+import nz.tate.worldgrid.core.GridMath;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -47,6 +49,41 @@ public class SceneGridOverlayTest
 				assertTrue("less than one cell past", boundary < from + size);
 				assertEquals("on the grid", 0, Math.floorMod(boundary - anchor, size));
 			}
+		}
+	}
+
+	@Test
+	public void compassLabelsSitOnTheCorrectEdges()
+	{
+		GridCell cell = new GridCell(10, 10, 0);
+		int size = 64;
+
+		int[] north = SceneGridOverlay.compassLabelPoint(cell, size, 'N');
+		int[] south = SceneGridOverlay.compassLabelPoint(cell, size, 'S');
+		int[] east = SceneGridOverlay.compassLabelPoint(cell, size, 'E');
+		int[] west = SceneGridOverlay.compassLabelPoint(cell, size, 'W');
+
+		// North is larger y, east is larger x. These are world directions, which is
+		// what keeps the labels correct as the camera rotates.
+		assertTrue("north is above south", north[1] > south[1]);
+		assertTrue("east is right of west", east[0] > west[0]);
+
+		// Opposite pairs share the other axis, so they line up across the square.
+		assertEquals(north[0], south[0]);
+		assertEquals(east[1], west[1]);
+	}
+
+	@Test
+	public void compassLabelsStayInsideTheirCell()
+	{
+		int size = 64;
+		GridCell cell = new GridCell(10, 10, 0);
+
+		for (char direction : new char[]{'N', 'S', 'E', 'W'})
+		{
+			int[] point = SceneGridOverlay.compassLabelPoint(cell, size, direction);
+			assertEquals("label " + direction + " belongs to its own cell",
+				cell, GridMath.toCell(point[0], point[1], 0, size));
 		}
 	}
 }

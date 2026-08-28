@@ -39,6 +39,8 @@ public class SceneGridOverlay extends Overlay
 	 */
 	private static final int MAX_LINES_PER_AXIS = 24;
 
+	private static final char[] DIRECTIONS = {'N', 'S', 'E', 'W'};
+
 	private final Client client;
 	private final WorldGridPlugin plugin;
 	private final WorldGridConfig config;
@@ -99,7 +101,41 @@ public class SceneGridOverlay extends Overlay
 
 		graphics.setStroke(previousStroke);
 		drawCellLabel(graphics, cell, gridSize);
+		drawCompassLabels(graphics, cell, gridSize);
 		return null;
+	}
+
+	/**
+	 * Labels the four edges of the current square with the compass direction they face.
+	 *
+	 * <p>Each label's position is worked out in world coordinates -- north is simply
+	 * larger y -- and only then projected to the screen. Because the projection already
+	 * accounts for where the camera is, the labels follow the world as it rotates
+	 * instead of being pinned to the screen. That is the whole point of them: they tell
+	 * you which way is north.
+	 */
+	private void drawCompassLabels(Graphics2D graphics, GridCell cell, int gridSize)
+	{
+		for (char direction : DIRECTIONS)
+		{
+			int[] point = compassLabelPoint(cell, gridSize, direction);
+			drawWorldText(graphics, String.valueOf(direction), point[0], point[1]);
+		}
+	}
+
+	private void drawWorldText(Graphics2D graphics, String text, int worldX, int worldY)
+	{
+		LocalPoint local = LocalPoint.fromWorld(client, worldX, worldY);
+		if (local == null)
+		{
+			return;
+		}
+
+		Point canvas = Perspective.getCanvasTextLocation(client, graphics, local, text, 0);
+		if (canvas != null)
+		{
+			OverlayUtil.renderTextLocation(graphics, canvas, text, config.gridColour());
+		}
 	}
 
 	/**
@@ -169,6 +205,29 @@ public class SceneGridOverlay extends Overlay
 		if (canvas != null)
 		{
 			OverlayUtil.renderTextLocation(graphics, canvas, reference, config.gridColour());
+		}
+	}
+
+	/** Edge midpoints of a cell, in world coordinates. Pure, so it is unit tested. */
+	static int[] compassLabelPoint(GridCell cell, int gridSize, char direction)
+	{
+		int westX = GridMath.originX(cell, gridSize);
+		int southY = GridMath.originY(cell, gridSize);
+		int centreX = GridMath.centreX(cell, gridSize);
+		int centreY = GridMath.centreY(cell, gridSize);
+
+		switch (direction)
+		{
+			case 'N':
+				return new int[]{centreX, southY + gridSize - 1};
+			case 'S':
+				return new int[]{centreX, southY};
+			case 'E':
+				return new int[]{westX + gridSize - 1, centreY};
+			case 'W':
+				return new int[]{westX, centreY};
+			default:
+				throw new IllegalArgumentException("Not a direction: " + direction);
 		}
 	}
 
