@@ -8,28 +8,26 @@ Captured during scoping. One entry per resolved question. Nothing here is code y
 
 **Question:** Where is the grid's origin? This determines what every reference looks like.
 
-**Decision: always anchored to the south-west corner of the overworld, ~(1024, 2496).
-Not user-configurable. Only the *grid size* is adjustable.**
+**Decision: always anchored at (768, 1792), south-west of the playable surface with
+margin. Not user-configurable. Only the *grid size* is adjustable.**
 
 ```
-size 64, anchor (1024, 2496)
+size 64, anchor (768, 1792)
 
-  Lumbridge       ->  L35
-  Varrock square  ->  O35
-  Grand Exchange  ->  P34
-  Falador         ->  N31
-  Edgeville       ->  P33
-  Catherby        ->  M26
-  Prifddinas      ->  J23
-  Kourend Castle  ->  T4
+  Lumbridge       ->  W39
+  Varrock square  ->  Z39
+  Grand Exchange  ->  AA38
+  Falador         ->  Y35
+  Edgeville       ->  AA37
+  Kourend Castle  ->  AD14
+  Wyrmscraig      ->  H29     (Sailing, south of the old anchor)
 ```
 
 **Why this matters.** Anchoring at the raw world origin `(0,0)` instead would make
-cells line up exactly with RuneScape regions (Lumbridge would be region 12850), but
-the playable overworld begins roughly 2500 tiles north of the origin, so *every*
-real-world reference becomes two letters — `AY50`, `BB50`, `BC49`. Nobody would ever
-see `A1`. Anchoring at the SW corner fits the whole surface in **26 rows x 46 columns**
-at size 64: single letters, short refs, easy to say out loud over voice comms.
+cells line up exactly with RuneScape regions (Lumbridge would be region 12850), but the
+playable surface begins well north of the origin, so *every* real reference would carry
+two or three letters. Anchoring near the SW corner keeps most of the populated surface
+in single-letter rows at size 64: short refs, easy to say out loud over voice comms.
 
 **Consequence — the anchor is a hard-coded constant, so it can never drift between
 players.** This is the significant win. The only setting two players must agree on is
@@ -37,11 +35,20 @@ the grid size (see D2). A mismatched *anchor* would have been invisible — both
 would see a plausible grid and simply disagree about names — and that failure mode is
 now designed out entirely.
 
-**Consequence — the exact constant needs pinning down.** `(1024, 2496)` is the working
-value used for the samples above and is not yet verified as the true SW extent of the
-playable surface. It must be locked before first release, because changing it later
-renames every square in the world and silently breaks every reference anyone has
-written down or shared. Treat it as a permanent API commitment.
+**Consequence — the constant is locked and carries deliberate margin.** This resolves O1.
+The earlier working value `(1024, 2496)` was correct against a 2023 cache but is now a
+**correctness bug**: Sailing (November 2025) pushed the surface south and west, and named
+playable content such as Wyrmscraig `(2567, 2295)` falls below y=2496, producing a
+negative row index that bijective base-26 cannot represent at all.
+
+Map-square enumeration of the March 2026 cache and the wiki's published surface basemap
+bounds independently put the current corner at `(960, 2048)`. The shipped anchor adds
+three regions of margin west and four south, because the map has expanded south-west
+three times in a decade — Zeah 2016, Varlamore 2024, Sailing 2025 — and this constant
+cannot be corrected after release. `768` and `1792` are both divisible by **256**, so grid
+lines coincide with region boundaries at every power-of-two grid size the config offers.
+
+Treat it as a permanent API commitment. `LandmarkReferenceTest` pins it.
 
 Reference points established from the RuneLite API:
 
@@ -49,9 +56,14 @@ Reference points established from the RuneLite API:
 Constants.REGION_SIZE     = 64
 Constants.CHUNK_SIZE      = 8
 Constants.SCENE_SIZE      = 104
-Constants.OVERWORLD_MAX_Y = 4160     // above this is caves / instances
+Constants.OVERWORLD_MAX_Y = 4160     // STALE - see below
 full coordinate space     = 16384 x 16384
 ```
+
+**`OVERWORLD_MAX_Y` is no longer a usable bound.** Sailing's northern oceans reach
+y=4223, above that constant, so testing against it now wrongly rejects the northernmost
+band of surface. The plugin never uses it; the parser validates against the full 16384
+space, which stays correct however the map grows.
 
 **Consequence — arithmetic must use `Math.floorDiv`, not bit masking.** With a
 non-zero anchor and arbitrary (non-power-of-two) grid sizes, the `& ~(size - 1)`

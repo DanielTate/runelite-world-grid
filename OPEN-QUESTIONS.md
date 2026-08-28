@@ -2,7 +2,7 @@
 
 Unresolved. Each needs an answer before or during build.
 
-**Resolved and moved to `DECISIONS.md`:** O3 (HUD readout toggle -> D26), O8 (current-cell
+**Resolved and moved to `DECISIONS.md`:** O1 (anchor -> D1), O3 (HUD readout toggle -> D26), O8 (current-cell
 highlight -> declined in D26), O10 (search input -> D19), O11 (saved schema -> D15), O13
 (v1 scope -> D18), O14 (pin lifecycle -> D17), O16 (merge labels -> D23), O17 (pinned
 export -> D20), O18 (search -> save -> D21), O19 (export scope -> D22), O20 (size cap ->
@@ -10,20 +10,9 @@ D25).
 
 ---
 
-**O1. Pin down the exact anchor constant. — BLOCKING, decide before v1**
-
-D1 fixed the anchor at the south-west corner of the overworld and used `(1024, 2496)` for
-its worked examples, but that value is **not yet verified** as the true SW extent of the
-playable surface.
-
-D18 raises the stakes: with everything shipping in v1, exported files exist in the wild
-from day one. Changing the anchor afterwards renames every square in the world and
-invalidates every reference anyone has written down or shared. Worth deriving from actual
-map data rather than picking a round number.
-
-This is now the **only remaining blocker**. The schema questions that shared its urgency
-(O17, O18, O19) are settled, so the v1 file format is fixed — see D20's field list. The
-anchor is the last permanent thing still undecided.
+*(O1, the anchor, is resolved. See D1 — it moved to `(768, 1792)` after Sailing pushed
+the playable surface south and west of the originally scoped value. There is no longer a
+blocking question.)*
 
 **O2. Is a bare ref enough, given grid size is free-form?**
 

@@ -4,7 +4,35 @@ Live record kept during the build. Newest first within each section.
 
 ## Open
 
-**R3. Three documented landmark samples do not match their documented references.**
+**R5. The anchor's margin is a bet on how far the map expands next.**
+
+The shipped anchor `(768, 1792)` sits three regions west and four south of the current
+south-west-most surface square `(960, 2048)`. That is deliberate insurance, not a
+measurement -- the map has moved south-west three times in a decade and the constant
+cannot be corrected after release.
+
+If a future expansion overshoots the margin, references break permanently for content
+beyond it. Nothing in the code can prevent that; the only mitigation available was to
+buy more margin, at the cost of longer references.
+
+**Watch for:** any content update that extends the surface west of x=768 or south of
+y=1792. `LandmarkReferenceTest.theSouthWestMostSurfaceSquareIsInsideTheGrid` is the
+canary, but it only checks the corner known at build time.
+
+---
+
+**R6. `Constants.OVERWORLD_MAX_Y` is stale and must never be used as a bound.**
+
+Sailing's northern oceans reach y=4223, above the constant's 4160. Any `y < OVERWORLD_MAX_Y`
+test now wrongly rejects the northernmost band of playable surface.
+
+The plugin deliberately does not use it -- validation runs against the full 0-16383 world
+space, which stays correct however the map grows. Recorded here because it is a plausible
+thing for someone to add later, and `RESEARCH.md` still cites the constant.
+
+---
+
+**R3. Three documented landmark samples did not match. Partly explained.**
 
 D1 lists eight worked examples. Five reproduce exactly under anchor (1024, 2496) at grid
 size 64, using coordinates recalled independently of the samples:
@@ -20,17 +48,18 @@ Prifddinas      (2240,3280)  J23  got M20
 Kourend Castle  (1610,3670)  T4   got S10
 ```
 
-Five independent matches is strong evidence the anchor and the reference convention are
-both right. The three misses are most likely wrong *coordinates* on my side rather than a
-wrong anchor -- they are the landmarks whose positions are least reliably recalled -- but
-that is unconfirmed. Being checked now.
+Now partly explained. **Kourend Castle's documented `T4` was simply wrong**: no anchor at
+any grid size 1-256 produces both `L35` for Lumbridge and `T4` for Kourend Castle, and the
+real coordinate `(1628, 3673)` gave `S10` under the old anchor. It reads like a
+plausible-sounding label attached to the wrong landmark.
 
-Only the five verified landmarks are pinned in `LandmarkReferenceTest`. The other three
-are deliberately excluded rather than pinned to values that may be wrong.
+`Catherby M26` and `Prifddinas J23` remain unexplained and are **not** pinned as tests.
+They are cosmetic now -- every sample in D1 was rewritten for the new anchor -- but if
+either turns out to be right it would imply something still misunderstood about the
+convention. Low priority.
 
-**Impact if the anchor is wrong:** every square in the world is renamed and every saved
-or spoken reference becomes invalid. This is the one value that cannot be fixed after
-release.
+Note the whole exercise was still worth it: the five matches confirmed the *convention*
+(letters encode rows), which is what let the anchor move safely.
 
 ---
 
