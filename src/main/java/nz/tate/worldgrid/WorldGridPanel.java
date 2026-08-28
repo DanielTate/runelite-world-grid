@@ -152,6 +152,18 @@ public class WorldGridPanel extends PluginPanel
 		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
+		JButton pin = compactButton(location.isPinned() ? "Pinned" : "Pin",
+			location.isPinned()
+				? "Remove this location's world map pin"
+				: "Show this location on the world map");
+		// A lit background rather than a tick, so the pin never reads as a selection
+		// checkbox sitting next to it.
+		pin.setBackground(location.isPinned()
+			? ColorScheme.BRAND_ORANGE
+			: ColorScheme.DARK_GRAY_COLOR);
+		pin.addActionListener(event -> togglePinned(location));
+		buttons.add(pin);
+
 		JButton showOnMap = compactButton("Map", "Centre the world map here");
 		showOnMap.addActionListener(event -> showOnMap(location));
 		buttons.add(showOnMap);
@@ -169,8 +181,14 @@ public class WorldGridPanel extends PluginPanel
 		button.setToolTipText(tooltip);
 		button.setFocusPainted(false);
 		button.setMargin(new Insets(2, 4, 2, 4));
-		button.setPreferredSize(new Dimension(text.length() > 1 ? 44 : 26, 22));
+		button.setPreferredSize(new Dimension(text.length() > 1 ? 8 + text.length() * 7 : 24, 22));
 		return button;
+	}
+
+	private void togglePinned(SavedLocation location)
+	{
+		repository.replaceAll(LocationEdits.withPinnedKey(repository.getLocations(),
+			LocationEdits.placeKey(location), !location.isPinned()), false);
 	}
 
 	private void showOnMap(SavedLocation location)

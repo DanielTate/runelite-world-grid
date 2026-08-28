@@ -58,6 +58,9 @@ public class WorldGridPlugin extends Plugin
 	private LocationRepository locationRepository;
 
 	@Inject
+	private PinManager pinManager;
+
+	@Inject
 	private ClientToolbar clientToolbar;
 
 	@Inject
@@ -98,6 +101,7 @@ public class WorldGridPlugin extends Plugin
 		clientToolbar.removeNavigation(navigationButton);
 		navigationButton = null;
 		locationRepository.shutDown();
+		pinManager.shutDown();
 		log.debug("World Grid stopped");
 	}
 
@@ -110,7 +114,11 @@ public class WorldGridPlugin extends Plugin
 	{
 		if (WorldGridConfig.GROUP.equals(event.getGroup()) && "gridSize".equals(event.getKey()))
 		{
-			SwingUtilities.invokeLater(panel::rebuild);
+			SwingUtilities.invokeLater(() ->
+			{
+				panel.rebuild();
+				pinManager.refresh();
+			});
 		}
 	}
 

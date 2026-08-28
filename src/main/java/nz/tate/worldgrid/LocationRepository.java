@@ -79,7 +79,8 @@ public class LocationRepository
 			executor.shutdownNow();
 			executor = null;
 		}
-		listeners.clear();
+		// Listeners are not dropped: the panel and the pin manager register once, when
+		// they are constructed, and outlive a stop-and-start of the plugin.
 		locations = Collections.emptyList();
 	}
 
