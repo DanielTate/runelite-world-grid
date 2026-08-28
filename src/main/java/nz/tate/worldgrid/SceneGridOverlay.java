@@ -90,11 +90,11 @@ public class SceneGridOverlay extends Overlay
 		int minY = location.getY() - radius;
 		int maxY = location.getY() + radius;
 
-		for (int x = firstBoundaryAtOrAfter(minX, GridAnchor.ANCHOR_X, gridSize); x <= maxX; x += gridSize)
+		for (int x = GridMath.firstBoundaryAtOrAfter(minX, GridAnchor.ANCHOR_X, gridSize); x <= maxX; x += gridSize)
 		{
 			drawBoundary(graphics, x, minY, maxY, true);
 		}
-		for (int y = firstBoundaryAtOrAfter(minY, GridAnchor.ANCHOR_Y, gridSize); y <= maxY; y += gridSize)
+		for (int y = GridMath.firstBoundaryAtOrAfter(minY, GridAnchor.ANCHOR_Y, gridSize); y <= maxY; y += gridSize)
 		{
 			drawBoundary(graphics, y, minX, maxX, false);
 		}
@@ -229,13 +229,5 @@ public class SceneGridOverlay extends Overlay
 			default:
 				throw new IllegalArgumentException("Not a direction: " + direction);
 		}
-	}
-
-	/** Lowest grid boundary at or after {@code from}. */
-	static int firstBoundaryAtOrAfter(int from, int anchor, int gridSize)
-	{
-		int index = Math.floorDiv(from - anchor, gridSize);
-		int boundary = anchor + index * gridSize;
-		return boundary < from ? boundary + gridSize : boundary;
 	}
 }

@@ -18,13 +18,13 @@ public class SceneGridOverlayTest
 	public void findsTheFirstBoundaryAtOrAfterAPoint()
 	{
 		// Anchor itself is a boundary.
-		assertEquals(1000, SceneGridOverlay.firstBoundaryAtOrAfter(1000, 1000, 64));
+		assertEquals(1000, GridMath.firstBoundaryAtOrAfter(1000, 1000, 64));
 
 		// One past a boundary rolls forward to the next.
-		assertEquals(1064, SceneGridOverlay.firstBoundaryAtOrAfter(1001, 1000, 64));
+		assertEquals(1064, GridMath.firstBoundaryAtOrAfter(1001, 1000, 64));
 
 		// Exactly on the next boundary stays put.
-		assertEquals(1064, SceneGridOverlay.firstBoundaryAtOrAfter(1064, 1000, 64));
+		assertEquals(1064, GridMath.firstBoundaryAtOrAfter(1064, 1000, 64));
 	}
 
 	@Test
@@ -32,8 +32,8 @@ public class SceneGridOverlayTest
 	{
 		// Plain division truncates toward zero here and would return a boundary that
 		// sits before the requested point.
-		assertEquals(936, SceneGridOverlay.firstBoundaryAtOrAfter(900, 1000, 64));
-		assertEquals(872, SceneGridOverlay.firstBoundaryAtOrAfter(872, 1000, 64));
+		assertEquals(936, GridMath.firstBoundaryAtOrAfter(900, 1000, 64));
+		assertEquals(872, GridMath.firstBoundaryAtOrAfter(872, 1000, 64));
 	}
 
 	@Test
@@ -44,7 +44,7 @@ public class SceneGridOverlayTest
 		{
 			for (int from = 700; from < 1400; from++)
 			{
-				int boundary = SceneGridOverlay.firstBoundaryAtOrAfter(from, anchor, size);
+				int boundary = GridMath.firstBoundaryAtOrAfter(from, anchor, size);
 				assertTrue("not before start", boundary >= from);
 				assertTrue("less than one cell past", boundary < from + size);
 				assertEquals("on the grid", 0, Math.floorMod(boundary - anchor, size));

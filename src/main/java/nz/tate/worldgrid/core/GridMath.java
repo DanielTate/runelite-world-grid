@@ -47,6 +47,17 @@ public final class GridMath
 		return originY(cell, gridSize) + gridSize / 2;
 	}
 
+	/**
+	 * Lowest grid boundary at or after {@code from}. Used by both overlays to find
+	 * where to start drawing lines across the visible area.
+	 */
+	public static int firstBoundaryAtOrAfter(int from, int anchor, int gridSize)
+	{
+		int index = Math.floorDiv(from - anchor, gridSize);
+		int boundary = anchor + index * gridSize;
+		return boundary < from ? boundary + gridSize : boundary;
+	}
+
 	public static boolean isValidGridSize(int gridSize)
 	{
 		return gridSize >= GridAnchor.MIN_GRID_SIZE && gridSize <= GridAnchor.MAX_GRID_SIZE;
