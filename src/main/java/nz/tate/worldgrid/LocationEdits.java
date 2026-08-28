@@ -5,6 +5,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import nz.tate.worldgrid.core.SavedLocation;
@@ -20,6 +21,9 @@ import nz.tate.worldgrid.core.SavedLocation;
  */
 public final class LocationEdits
 {
+	/** Above this many rows, a bulk delete asks first. */
+	public static final int MAX_DELETE_WITHOUT_CONFIRMATION = 3;
+
 	/** Longest label the codec will accept back off disk. */
 	public static final int MAX_LABEL_LENGTH = 100;
 
@@ -137,6 +141,43 @@ public final class LocationEdits
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Drops selected rows that are no longer in the list. Selection is transient view
+	 * state, so it must not keep pointing at places that have gone.
+	 */
+	public static Set<String> retainExisting(Set<String> keys, List<SavedLocation> locations)
+	{
+		Set<String> present = new LinkedHashSet<>();
+		for (SavedLocation location : locations)
+		{
+			String key = placeKey(location);
+			if (keys.contains(key))
+			{
+				present.add(key);
+			}
+		}
+		return present;
+	}
+
+	public static Set<String> allKeys(List<SavedLocation> locations)
+	{
+		Set<String> keys = new LinkedHashSet<>();
+		for (SavedLocation location : locations)
+		{
+			keys.add(placeKey(location));
+		}
+		return keys;
+	}
+
+	/**
+	 * Deleting a couple of rows you just ticked is unsurprising; clearing out a dozen is
+	 * the mis-click worth stopping. A backup is written either way.
+	 */
+	public static boolean needsDeleteConfirmation(int count)
+	{
+		return count > MAX_DELETE_WITHOUT_CONFIRMATION;
 	}
 
 	/**

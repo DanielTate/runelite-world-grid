@@ -143,6 +143,50 @@ public class LocationEditsTest
 	}
 
 	@Test
+	public void selectAllPicksUpEveryRowInOrder()
+	{
+		Set<String> keys = LocationEdits.allKeys(library());
+
+		assertEquals(3, keys.size());
+		assertTrue(keys.contains(LocationEdits.placeKey(MEET)));
+		assertTrue(keys.contains(LocationEdits.placeKey(UPSTAIRS)));
+	}
+
+	@Test
+	public void selectionForgetsRowsThatHaveGone()
+	{
+		Set<String> selected = LocationEdits.allKeys(library());
+		List<SavedLocation> afterDelete = Collections.singletonList(MEET);
+
+		Set<String> remaining = LocationEdits.retainExisting(selected, afterDelete);
+
+		assertEquals(1, remaining.size());
+		assertTrue(remaining.contains(LocationEdits.placeKey(MEET)));
+	}
+
+	@Test
+	public void selectionSurvivesAPinToggleBecauseItIsKeyedByPlace()
+	{
+		Set<String> selected = new HashSet<>();
+		selected.add(LocationEdits.placeKey(MEET));
+
+		List<SavedLocation> afterPinning =
+			LocationEdits.withPinnedKey(library(), LocationEdits.placeKey(MEET), true);
+
+		assertEquals(1, LocationEdits.retainExisting(selected, afterPinning).size());
+	}
+
+	@Test
+	public void onlyLargerDeletionsAskFirst()
+	{
+		assertFalse(LocationEdits.needsDeleteConfirmation(1));
+		assertFalse(LocationEdits.needsDeleteConfirmation(
+			LocationEdits.MAX_DELETE_WITHOUT_CONFIRMATION));
+		assertTrue(LocationEdits.needsDeleteConfirmation(
+			LocationEdits.MAX_DELETE_WITHOUT_CONFIRMATION + 1));
+	}
+
+	@Test
 	public void aBlankOrCancelledNameIsRejected()
 	{
 		assertNull(LocationEdits.cleanLabel(null));

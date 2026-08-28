@@ -7,10 +7,13 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -44,6 +47,14 @@ public class WorldGridPanel extends PluginPanel
 	private final LocationRepository repository;
 
 	private final JPanel listPanel = new JPanel(new GridLayout(0, 1, 0, 5));
+	private final JCheckBox selectAll = new JCheckBox("Select all");
+	private final JButton deleteSelected = new JButton("Delete selected (0)");
+
+	/**
+	 * Transient view state. Rows are held by coordinate rather than by object, because
+	 * pinning replaces the entry object while still meaning the same place. Never saved.
+	 */
+	private Set<String> selectedKeys = new LinkedHashSet<>();
 
 	@Inject
 	WorldGridPanel(Client client, ClientThread clientThread, WorldGridConfig config,
@@ -86,6 +97,15 @@ public class WorldGridPanel extends PluginPanel
 		saveCurrent.addActionListener(event -> saveCurrentLocation());
 		header.add(saveCurrent);
 
+		selectAll.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		selectAll.setFocusPainted(false);
+		selectAll.addActionListener(event -> toggleSelectAll());
+		header.add(selectAll);
+
+		deleteSelected.setFocusPainted(false);
+		deleteSelected.addActionListener(event -> deleteSelected());
+		header.add(deleteSelected);
+
 		return header;
 	}
 
@@ -101,6 +121,8 @@ public class WorldGridPanel extends PluginPanel
 		}
 
 		List<SavedLocation> locations = repository.getLocations();
+		selectedKeys = LocationEdits.retainExisting(selectedKeys, locations);
+
 		if (locations.isEmpty())
 		{
 			listPanel.add(createMessage("Nothing saved yet."));
@@ -114,6 +136,7 @@ public class WorldGridPanel extends PluginPanel
 			}
 		}
 
+		updateSelectionControls(locations);
 		listPanel.revalidate();
 		listPanel.repaint();
 	}
@@ -142,6 +165,13 @@ public class WorldGridPanel extends PluginPanel
 		reference.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		text.add(reference);
 
+		JCheckBox select = new JCheckBox();
+		select.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		select.setToolTipText("Select for bulk delete");
+		select.setSelected(selectedKeys.contains(LocationEdits.placeKey(location)));
+		select.addActionListener(event -> setSelected(location, select.isSelected()));
+
+		row.add(select, BorderLayout.WEST);
 		row.add(text, BorderLayout.CENTER);
 		row.add(createRowButtons(location), BorderLayout.EAST);
 		return row;
@@ -185,6 +215,71 @@ public class WorldGridPanel extends PluginPanel
 		return button;
 	}
 
+	private void setSelected(SavedLocation location, boolean selected)
+	{
+		String key = LocationEdits.placeKey(location);
+		if (selected)
+		{
+			selectedKeys.add(key);
+		}
+		else
+		{
+			selectedKeys.remove(key);
+		}
+		updateSelectionControls(repository.getLocations());
+	}
+
+	private void toggleSelectAll()
+	{
+		if (selectAll.isSelected())
+		{
+			selectedKeys = LocationEdits.allKeys(repository.getLocations());
+		}
+		else
+		{
+			selectedKeys = new LinkedHashSet<>();
+		}
+		rebuild();
+	}
+
+	private void updateSelectionControls(List<SavedLocation> locations)
+	{
+		deleteSelected.setText("Delete selected (" + selectedKeys.size() + ")");
+		deleteSelected.setEnabled(!selectedKeys.isEmpty());
+		selectAll.setEnabled(!locations.isEmpty());
+		selectAll.setSelected(!locations.isEmpty() && selectedKeys.size() == locations.size());
+	}
+
+	private void deleteSelected()
+	{
+		int count = selectedKeys.size();
+		if (count == 0)
+		{
+			return;
+		}
+
+		if (LocationEdits.needsDeleteConfirmation(count)
+			&& JOptionPane.showConfirmDialog(this,
+				"Delete " + count + " saved locations?\n"
+					+ "A backup of the current file is written first.",
+				"Delete locations", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION)
+		{
+			return;
+		}
+
+		repository.replaceAll(
+			LocationEdits.withoutKeys(repository.getLocations(), selectedKeys), true);
+		selectedKeys = new LinkedHashSet<>();
+	}
+
+	/** Selection is view state only, so closing the panel forgets it. */
+	@Override
+	public void onDeactivate()
+	{
+		selectedKeys = new LinkedHashSet<>();
+		rebuild();
+	}
+
 	private void togglePinned(SavedLocation location)
 	{
 		repository.replaceAll(LocationEdits.withPinnedKey(repository.getLocations(),
@@ -216,7 +311,7 @@ public class WorldGridPanel extends PluginPanel
 		}
 
 		repository.replaceAll(LocationEdits.withoutKeys(repository.getLocations(),
-			Collections.singleton(LocationEdits.placeKey(location))), false);
+			Collections.singleton(LocationEdits.placeKey(location))), true);
 	}
 
 	/**
