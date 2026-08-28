@@ -30,18 +30,6 @@ Cheap to fix if it ever bites: build the panel inside a `SwingUtilities.invokeLa
 
 ---
 
-**R10. Import and export callbacks can outlive the plugin being stopped.**
-
-`LocationRepository.readImportFile` and `writeExportFile` hand their result back with
-`SwingUtilities.invokeLater`. If the user disables the plugin between choosing a file and
-the worker finishing, the callback still runs and shows its dialog against a panel that
-is no longer on the toolbar. Harmless -- the repository's executor is gone, so nothing is
-written -- but the dialog is confusing.
-
-Not mitigated. A cancellation token on the repository would fix it and was judged not
-worth the complexity for an action the user has to initiate by hand.
-
----
 
 **R9. "Save location" and "Remove pin" sit on the map menu, not strictly on the pin.**
 
@@ -152,6 +140,12 @@ plugin's primary use case.
 Nothing in the code can detect this. Worth revisiting if it bites in practice.
 
 ## Resolved
+
+**R10. Import and export callbacks could outlive the plugin being stopped.** The executor
+was null-checked before submitting, but the plugin could stop in the gap between that check
+and the submit, throwing RejectedExecutionException out of a file chooser callback. Now
+caught and logged at debug. A dropped task is correct behaviour here -- the plugin is off.
+
 
 **R2. The reference convention was ambiguous between two readings.** D7 states letters
 increase going north and numbers going east, but that could be read as letters encoding

@@ -13,6 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -167,7 +168,18 @@ public class LocationRepository
 		{
 			return;
 		}
-		current.submit(task);
+
+		try
+		{
+			current.submit(task);
+		}
+		catch (RejectedExecutionException e)
+		{
+			// The plugin was stopped between reading the executor and submitting. A
+			// file chooser callback can arrive long after the user turned the plugin
+			// off, so this is reachable in normal use, not just at shutdown.
+			log.debug("Dropped a locations task because the plugin is stopping", e);
+		}
 	}
 
 	private void notifyListeners()
