@@ -9,6 +9,7 @@ import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -61,6 +62,12 @@ public class WorldGridPlugin extends Plugin
 	private PinManager pinManager;
 
 	@Inject
+	private GridSearch gridSearch;
+
+	@Inject
+	private EventBus eventBus;
+
+	@Inject
 	private ClientToolbar clientToolbar;
 
 	@Inject
@@ -81,6 +88,7 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.add(sceneGridOverlay);
 		overlayManager.add(worldMapGridOverlay);
 		locationRepository.startUp();
+		eventBus.register(gridSearch);
 
 		navigationButton = NavigationButton.builder()
 			.tooltip("World Grid")
@@ -100,6 +108,8 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.remove(worldMapGridOverlay);
 		clientToolbar.removeNavigation(navigationButton);
 		navigationButton = null;
+		eventBus.unregister(gridSearch);
+		gridSearch.shutDown();
 		locationRepository.shutDown();
 		pinManager.shutDown();
 		log.debug("World Grid stopped");
