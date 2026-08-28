@@ -42,6 +42,9 @@ public class WorldGridPlugin extends Plugin
 	@Inject
 	private GridRefHudOverlay hudOverlay;
 
+	@Inject
+	private SceneGridOverlay sceneGridOverlay;
+
 	@Provides
 	WorldGridConfig provideConfig(ConfigManager configManager)
 	{
@@ -52,6 +55,7 @@ public class WorldGridPlugin extends Plugin
 	protected void startUp()
 	{
 		overlayManager.add(hudOverlay);
+		overlayManager.add(sceneGridOverlay);
 		log.debug("World Grid started");
 	}
 
@@ -59,6 +63,7 @@ public class WorldGridPlugin extends Plugin
 	protected void shutDown()
 	{
 		overlayManager.remove(hudOverlay);
+		overlayManager.remove(sceneGridOverlay);
 		log.debug("World Grid stopped");
 	}
 
