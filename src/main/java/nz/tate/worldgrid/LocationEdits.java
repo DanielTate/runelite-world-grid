@@ -20,11 +20,39 @@ import nz.tate.worldgrid.core.SavedLocation;
  */
 public final class LocationEdits
 {
+	/** Longest label the codec will accept back off disk. */
+	public static final int MAX_LABEL_LENGTH = 100;
+
 	private static final DateTimeFormatter BACKUP_STAMP =
 		DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
 	private LocationEdits()
 	{
+	}
+
+	/**
+	 * Tidies a name typed by the user.
+	 *
+	 * @return the name to store, or null when nothing usable was typed
+	 */
+	public static String cleanLabel(String typed)
+	{
+		if (typed == null)
+		{
+			return null;
+		}
+
+		String trimmed = typed.trim();
+		if (trimmed.isEmpty())
+		{
+			return null;
+		}
+		if (trimmed.length() > MAX_LABEL_LENGTH)
+		{
+			// Truncating keeps the entry; rejecting it would throw the location away.
+			return trimmed.substring(0, MAX_LABEL_LENGTH);
+		}
+		return trimmed;
 	}
 
 	/** Stable identity of a place: the coordinate, never the label. */

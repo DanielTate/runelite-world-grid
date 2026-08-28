@@ -11,6 +11,7 @@ import java.util.Set;
 import nz.tate.worldgrid.core.SavedLocation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
@@ -139,6 +140,28 @@ public class LocationEditsTest
 	{
 		assertTrue(LocationEdits.containsKey(library(), "3222,3218,0"));
 		assertFalse(LocationEdits.containsKey(library(), "3222,3218,1"));
+	}
+
+	@Test
+	public void aBlankOrCancelledNameIsRejected()
+	{
+		assertNull(LocationEdits.cleanLabel(null));
+		assertNull(LocationEdits.cleanLabel(""));
+		assertNull(LocationEdits.cleanLabel("   "));
+	}
+
+	@Test
+	public void aNameIsTrimmedAndOverlongOnesAreTruncated()
+	{
+		assertEquals("Wine spot", LocationEdits.cleanLabel("  Wine spot  "));
+
+		StringBuilder tooLong = new StringBuilder();
+		for (int i = 0; i < 250; i++)
+		{
+			tooLong.append('a');
+		}
+		assertEquals(LocationEdits.MAX_LABEL_LENGTH,
+			LocationEdits.cleanLabel(tooLong.toString()).length());
 	}
 
 	@Test

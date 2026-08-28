@@ -2,14 +2,20 @@ package nz.tate.worldgrid;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ImageUtil;
 import nz.tate.worldgrid.core.GridCell;
 import nz.tate.worldgrid.core.GridMath;
 import nz.tate.worldgrid.core.GridRefFormatter;
@@ -51,6 +57,14 @@ public class WorldGridPlugin extends Plugin
 	@Inject
 	private LocationRepository locationRepository;
 
+	@Inject
+	private ClientToolbar clientToolbar;
+
+	@Inject
+	private WorldGridPanel panel;
+
+	private NavigationButton navigationButton;
+
 	@Provides
 	WorldGridConfig provideConfig(ConfigManager configManager)
 	{
@@ -64,6 +78,14 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.add(sceneGridOverlay);
 		overlayManager.add(worldMapGridOverlay);
 		locationRepository.startUp();
+
+		navigationButton = NavigationButton.builder()
+			.tooltip("World Grid")
+			.icon(ImageUtil.loadImageResource(WorldGridPlugin.class, "panel_icon.png"))
+			.priority(6)
+			.panel(panel)
+			.build();
+		clientToolbar.addNavigation(navigationButton);
 		log.debug("World Grid started");
 	}
 
@@ -73,8 +95,23 @@ public class WorldGridPlugin extends Plugin
 		overlayManager.remove(hudOverlay);
 		overlayManager.remove(sceneGridOverlay);
 		overlayManager.remove(worldMapGridOverlay);
+		clientToolbar.removeNavigation(navigationButton);
+		navigationButton = null;
 		locationRepository.shutDown();
 		log.debug("World Grid stopped");
+	}
+
+	/**
+	 * Grid size is a pure view setting, so changing it renames every saved location
+	 * without touching the file.
+	 */
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (WorldGridConfig.GROUP.equals(event.getGroup()) && "gridSize".equals(event.getKey()))
+		{
+			SwingUtilities.invokeLater(panel::rebuild);
+		}
 	}
 
 	/**
