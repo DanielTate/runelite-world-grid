@@ -17,6 +17,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.Client;
@@ -25,6 +26,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.worldmap.WorldMap;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import nz.tate.worldgrid.core.SavedLocation;
 
@@ -41,6 +43,9 @@ import nz.tate.worldgrid.core.SavedLocation;
 @Singleton
 public class WorldGridPanel extends PluginPanel
 {
+	/** Must match runelite-plugin.properties; a test checks it does. */
+	static final String VERSION = "1.0";
+
 	private final Client client;
 	private final ClientThread clientThread;
 	private final WorldGridConfig config;
@@ -80,9 +85,18 @@ public class WorldGridPanel extends PluginPanel
 		listPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		listHolder.add(listPanel, BorderLayout.NORTH);
 		add(listHolder, BorderLayout.CENTER);
+		add(versionLabel(), BorderLayout.SOUTH);
 
 		repository.addListener(this::rebuild);
 		rebuild();
+	}
+
+	private static JLabel versionLabel()
+	{
+		JLabel version = new JLabel("v" + VERSION, SwingConstants.RIGHT);
+		version.setFont(FontManager.getRunescapeSmallFont());
+		version.setForeground(ColorScheme.LIGHT_GRAY_COLOR.darker());
+		return version;
 	}
 
 	private JPanel createHeader()
