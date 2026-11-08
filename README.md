@@ -27,7 +27,8 @@ Not on the plugin hub yet. To build and run locally:
 | **Grid lines** | On the world map and on the game scene. |
 | **Your reference** | A movable readout, plus the reference labelled on the square you stand in with N/S/E/W markers on its edges. |
 | **Search** | Right-click the world map → *Search grid ref*. Type `W39`, the map jumps there and drops a pin. |
-| **Saved locations** | A side panel of named places. Pin the ones you care about to show them on the map. |
+| **Side panel** | Shows the square you're standing in, has every setting (show or hide the grid in game, on the world map and in the readout box, square size, colour and line thickness), and keeps your saved locations. |
+| **Saved locations** | Named places in the side panel. Pin the ones you care about to show them on the map. |
 | **Import / export** | Share a list of named places with your clan as a JSON file. |
 
 Inside an instance (raids, Theatre of Blood, a POH) the plugin shows `—` and draws

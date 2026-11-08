@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.EventBus;
@@ -75,6 +76,10 @@ public class WorldGridPlugin extends Plugin
 
 	private NavigationButton navigationButton;
 
+	/** What the side panel last showed, so it's only updated when you change square. */
+	private String shownReference;
+	private WorldPoint shownTile;
+
 	@Provides
 	WorldGridConfig provideConfig(ConfigManager configManager)
 	{
@@ -122,14 +127,40 @@ public class WorldGridPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (WorldGridConfig.GROUP.equals(event.getGroup()) && "gridSize".equals(event.getKey()))
+		if (!WorldGridConfig.GROUP.equals(event.getGroup()))
 		{
+			return;
+		}
+		if ("gridSize".equals(event.getKey()))
+		{
+			shownReference = null;
 			SwingUtilities.invokeLater(() ->
 			{
 				panel.rebuild();
+				panel.settingsChanged();
 				pinManager.refresh();
 			});
 		}
+		else
+		{
+			SwingUtilities.invokeLater(panel::settingsChanged);
+		}
+	}
+
+	/** Shows your square in the side panel, updating it only when you move. */
+	@Subscribe
+	public void onGameTick(GameTick tick)
+	{
+		String reference = currentReference();
+		Player player = client.getLocalPlayer();
+		WorldPoint tile = player == null || client.isInInstancedRegion() ? null : player.getWorldLocation();
+		if (reference.equals(shownReference) && java.util.Objects.equals(tile, shownTile))
+		{
+			return;
+		}
+		shownReference = reference;
+		shownTile = tile;
+		SwingUtilities.invokeLater(() -> panel.showReference(reference, tile));
 	}
 
 	/**
