@@ -1,11 +1,8 @@
 package nz.tate.worldgrid;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
+import java.awt.Color;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.Insets;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,6 +11,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -25,16 +23,20 @@ import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.worldmap.WorldMap;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.ui.components.colorpicker.ColorPickerManager;
+import net.runelite.client.ui.components.colorpicker.RuneliteColorPicker;
 import nz.tate.worldgrid.core.SavedLocation;
 
 /**
- * The saved-location library.
+ * The side panel: where you are on the grid right now, switches for where the grid is drawn,
+ * and the saved-location library.
  *
  * <p>There is no search box here on purpose: searching lives on the world map's
- * right-click menu, so this panel is only ever a list of places you have kept.
+ * right-click menu, so the library is only ever a list of places you have kept.
  *
  * <p>Everything in this class runs on the Swing event thread. Reading the player's
  * position goes through {@link ClientThread}, and the answer comes back with
@@ -44,17 +46,29 @@ import nz.tate.worldgrid.core.SavedLocation;
 public class WorldGridPanel extends PluginPanel
 {
 	/** Must match runelite-plugin.properties; a test checks it does. */
-	static final String VERSION = "1.0.1";
+	static final String VERSION = "1.1";
 
 	private final Client client;
 	private final ClientThread clientThread;
 	private final WorldGridConfig config;
+	private final ConfigManager configManager;
 	private final LocationRepository repository;
 	private final ImportExport importExport;
 
-	private final JPanel listPanel = new JPanel(new GridLayout(0, 1, 0, 5));
-	private final JCheckBox selectAll = new JCheckBox("Select all");
-	private final JButton deleteSelected = new JButton("Delete selected (0)");
+	private final JLabel reference = new JLabel(WorldGridPlugin.NO_REFERENCE);
+	private final JLabel referenceDetail = PanelStyle.small("");
+	private final PanelStyle.Switch drawInScene;
+	private final PanelStyle.Switch drawOnWorldMap;
+	private final PanelStyle.Switch showReadout;
+	private final PanelStyle.Stepper gridSize;
+	private final PanelStyle.Stepper lineThickness;
+	private final PanelStyle.Swatch gridColour;
+	private final ColorPickerManager colorPickerManager;
+	private final JLabel savedCount = PanelStyle.small("");
+	private final JPanel listPanel = PanelStyle.column(4);
+	private final PanelStyle.TickBox selectAll = new PanelStyle.TickBox();
+	private final JLabel selectAllLabel = PanelStyle.small("Select all");
+	private final JLabel deleteSelected = PanelStyle.link("Delete selected", "Delete every ticked location", this::deleteSelected);
 
 	/**
 	 * Transient view state. Rows are held by coordinate rather than by object, because
@@ -63,32 +77,49 @@ public class WorldGridPanel extends PluginPanel
 	private Set<String> selectedKeys = new LinkedHashSet<>();
 
 	@Inject
-	WorldGridPanel(Client client, ClientThread clientThread, WorldGridConfig config,
-		LocationRepository repository, ImportExport importExport)
+	WorldGridPanel(Client client, ClientThread clientThread, WorldGridConfig config, ConfigManager configManager,
+		ColorPickerManager colorPickerManager, LocationRepository repository, ImportExport importExport)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
 		this.config = config;
+		this.configManager = configManager;
+		this.colorPickerManager = colorPickerManager;
+		drawInScene = new PanelStyle.Switch(config.drawInScene());
+		drawOnWorldMap = new PanelStyle.Switch(config.drawOnWorldMap());
+		showReadout = new PanelStyle.Switch(config.showRefReadout());
+		gridSize = new PanelStyle.Stepper(config.gridSize(), 1, 256);
+		lineThickness = new PanelStyle.Stepper(config.lineThickness(), 1, 5);
+		gridColour = new PanelStyle.Swatch(config.gridColour(), this::pickColour);
 		this.repository = repository;
 		this.importExport = importExport;
 
-		setLayout(new BorderLayout(0, 10));
+		setLayout(new BorderLayout(0, PanelStyle.GAP));
 		setBorder(new EmptyBorder(10, 10, 10, 10));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		add(createHeader(), BorderLayout.NORTH);
-
-		// The list sits at the top of a stretchy panel so short lists do not have their
-		// rows spread down the whole panel.
-		JPanel listHolder = new JPanel(new BorderLayout());
-		listHolder.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		listPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		listHolder.add(listPanel, BorderLayout.NORTH);
-		add(listHolder, BorderLayout.CENTER);
+		JPanel sections = PanelStyle.column(PanelStyle.GAP);
+		sections.add(header());
+		sections.add(PanelStyle.card("You are in", null, referenceArea()));
+		sections.add(PanelStyle.card("Grid", null, gridArea()));
+		sections.add(PanelStyle.card("Appearance", null, appearanceArea()));
+		sections.add(PanelStyle.card("Saved locations", savedCount, savedArea()));
+		add(sections, BorderLayout.NORTH);
 		add(versionLabel(), BorderLayout.SOUTH);
 
 		repository.addListener(this::rebuild);
 		rebuild();
+	}
+
+	private static JComponent header()
+	{
+		JLabel title = new JLabel("World Grid");
+		title.setFont(FontManager.getRunescapeBoldFont().deriveFont(16f));
+		title.setForeground(Color.WHITE);
+		JPanel header = PanelStyle.column(2);
+		header.add(title);
+		header.add(PanelStyle.small("Name any spot in the world by its square"));
+		return header;
 	}
 
 	private static JLabel versionLabel()
@@ -99,47 +130,121 @@ public class WorldGridPanel extends PluginPanel
 		return version;
 	}
 
-	private JPanel createHeader()
+	private JComponent referenceArea()
 	{
-		JPanel header = new JPanel(new GridLayout(0, 1, 0, 5));
-		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		// The plain font: the bold one leaves a gap before every 0.
+		reference.setFont(FontManager.getRunescapeFont().deriveFont(32f));
+		reference.setForeground(PanelStyle.ACCENT);
+		JPanel area = PanelStyle.column(2);
+		area.add(reference);
+		area.add(referenceDetail);
+		showReference(WorldGridPlugin.NO_REFERENCE, null);
+		return area;
+	}
 
-		JLabel title = new JLabel("Saved locations");
-		title.setFont(title.getFont().deriveFont(Font.BOLD));
-		header.add(title);
+	private JComponent gridArea()
+	{
+		drawInScene.onChange(on -> set("drawInScene", on));
+		drawOnWorldMap.onChange(on -> set("drawOnWorldMap", on));
+		showReadout.onChange(on -> set("showRefReadout", on));
+		gridSize.onChange(size -> set("gridSize", size));
+		JPanel area = PanelStyle.column(10);
+		area.add(PanelStyle.toggle(drawInScene, "Show in game", "Lines and labels on the ground"));
+		area.add(PanelStyle.toggle(drawOnWorldMap, "Show on world map", "Lines and labels on the map"));
+		area.add(PanelStyle.toggle(showReadout, "Reference box", "Your square, in a movable box"));
+		gridSize.setToolTipText("Friends must use the same size for your references to match");
+		area.add(PanelStyle.setting("Square size", "Tiles per square", gridSize));
+		return area;
+	}
 
-		JButton saveCurrent = new JButton("Save current location");
-		saveCurrent.setFocusPainted(false);
-		saveCurrent.addActionListener(event -> saveCurrentLocation());
-		header.add(saveCurrent);
+	private JComponent appearanceArea()
+	{
+		lineThickness.onChange(px -> set("lineThickness", px));
+		JPanel area = PanelStyle.column(10);
+		area.add(PanelStyle.setting("Colour", "Lines and labels", gridColour));
+		area.add(PanelStyle.setting("Line thickness", "In pixels, 1 to 5", lineThickness));
+		return area;
+	}
 
-		selectAll.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		selectAll.setFocusPainted(false);
-		selectAll.addActionListener(event -> toggleSelectAll());
-		header.add(selectAll);
+	private void set(String key, Object value)
+	{
+		configManager.setConfiguration(WorldGridConfig.GROUP, key, value);
+	}
 
-		deleteSelected.setFocusPainted(false);
-		deleteSelected.addActionListener(event -> deleteSelected());
-		header.add(deleteSelected);
+	/** Opens RuneLite's own colour picker, saving the colour as it changes. */
+	private void pickColour()
+	{
+		RuneliteColorPicker picker = colorPickerManager.create(SwingUtilities.getWindowAncestor(this),
+			config.gridColour(), "Grid colour", false);
+		picker.setLocationRelativeTo(this);
+		picker.setOnColorChange(colour ->
+		{
+			gridColour.setColour(colour);
+			set("gridColour", colour);
+		});
+		picker.setVisible(true);
+	}
 
-		JPanel transfer = new JPanel(new GridLayout(1, 2, 5, 0));
-		transfer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+	private JComponent savedArea()
+	{
+		JComponent saveCurrent = PanelStyle.button("+  Save current location",
+			"Name the tile you're standing on and keep it here", this::saveCurrentLocation);
 
-		JButton importButton = new JButton("Import");
-		importButton.setFocusPainted(false);
-		importButton.addActionListener(event ->
-			importExport.startImport(this, this::clearSelection));
-		transfer.add(importButton);
+		selectAll.onChange(on -> toggleSelectAll(on));
+		JPanel tickAll = new JPanel(new java.awt.FlowLayout(FlowLayout.LEFT, 6, 0));
+		tickAll.setOpaque(false);
+		tickAll.add(selectAll);
+		tickAll.add(selectAllLabel);
+		JPanel bulk = new JPanel(new BorderLayout());
+		bulk.setOpaque(false);
+		bulk.add(tickAll, BorderLayout.WEST);
+		bulk.add(deleteSelected, BorderLayout.EAST);
 
-		JButton exportButton = new JButton("Export");
-		exportButton.setFocusPainted(false);
-		exportButton.addActionListener(event ->
-			importExport.export(this, repository.getLocations()));
-		transfer.add(exportButton);
+		JLabel importLink = PanelStyle.link("Import", "Add locations from a file",
+			() -> importExport.startImport(this, this::clearSelection));
+		JLabel exportLink = PanelStyle.link("Export", "Save your locations to a file to share",
+			() -> importExport.export(this, repository.getLocations()));
+		JPanel transfer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		transfer.setOpaque(false);
+		transfer.add(importLink);
+		transfer.add(dot());
+		transfer.add(exportLink);
 
-		header.add(transfer);
+		JPanel area = PanelStyle.column(6);
+		area.add(saveCurrent);
+		area.add(listPanel);
+		area.add(PanelStyle.fixedHeight(bulk));
+		area.add(PanelStyle.fixedHeight(transfer));
+		return area;
+	}
 
-		return header;
+	private static JLabel dot()
+	{
+		JLabel dot = PanelStyle.small(" \u00B7 ");
+		dot.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		return dot;
+	}
+
+	/** Shows the square you're standing in, or a dash with why there's none. */
+	void showReference(String ref, WorldPoint where)
+	{
+		boolean known = ref != null && !WorldGridPlugin.NO_REFERENCE.equals(ref);
+		reference.setText(known ? ref : WorldGridPlugin.NO_REFERENCE);
+		reference.setForeground(known ? PanelStyle.ACCENT : PanelStyle.MUTED);
+		referenceDetail.setText(known && where != null
+			? config.gridSize() + "-tile squares \u00B7 tile " + where.getX() + ", " + where.getY()
+			: "Not available here (logged out or in an instance)");
+	}
+
+	/** Keeps the switches in step when a setting changes from the config panel. */
+	void settingsChanged()
+	{
+		drawInScene.setOn(config.drawInScene());
+		drawOnWorldMap.setOn(config.drawOnWorldMap());
+		showReadout.setOn(config.showRefReadout());
+		gridSize.setValue(config.gridSize());
+		lineThickness.setValue(config.lineThickness());
+		gridColour.setColour(config.gridColour());
 	}
 
 	/** Rebuilds every row. Cheap enough for a list of this size and impossible to get stale. */
@@ -169,6 +274,7 @@ public class WorldGridPanel extends PluginPanel
 			}
 		}
 
+		savedCount.setText(locations.size() == 1 ? "1 place" : locations.size() + " places");
 		updateSelectionControls(locations);
 		listPanel.revalidate();
 		listPanel.repaint();
@@ -176,76 +282,57 @@ public class WorldGridPanel extends PluginPanel
 
 	private JLabel createMessage(String text)
 	{
-		JLabel message = new JLabel("<html><body style='width:170px'>" + text + "</body></html>");
-		message.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		JLabel message = new JLabel("<html><body style='width:150px'>" + text + "</body></html>");
+		message.setFont(FontManager.getRunescapeSmallFont());
+		message.setForeground(PanelStyle.MUTED);
 		return message;
 	}
 
-	private JPanel createRow(SavedLocation location, int gridSize)
+	/** A saved place: a tick box for bulk delete, its name and square, then its actions. */
+	private JComponent createRow(SavedLocation location, int gridSize)
 	{
-		JPanel row = new JPanel(new BorderLayout(4, 0));
-		row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		row.setBorder(new EmptyBorder(6, 8, 6, 4));
+		PanelStyle.TickBox select = new PanelStyle.TickBox();
+		select.setToolTipText("Tick to delete several at once");
+		select.setTicked(selectedKeys.contains(LocationEdits.placeKey(location)));
+		select.onChange(on -> setSelected(location, on));
 
-		JPanel text = new JPanel(new GridLayout(2, 1));
-		text.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-		JLabel name = new JLabel(location.getLabel());
+		JLabel name = PanelStyle.text(location.getLabel());
 		name.setToolTipText(location.getLabel());
+		JLabel ref = PanelStyle.small(LocationDisplay.reference(location, gridSize)
+			+ (location.isPinned() ? " \u00B7 pinned" : ""));
+		if (location.isPinned())
+		{
+			ref.setForeground(PanelStyle.ACCENT);
+		}
+
+		JLabel pin = PanelStyle.link(location.isPinned() ? "Unpin" : "Pin",
+			location.isPinned() ? "Remove this location's world map pin" : "Show this location on the world map",
+			() -> togglePinned(location));
+		JLabel map = PanelStyle.link("Map", "Centre the world map here", () -> showOnMap(location));
+		JLabel delete = PanelStyle.link("Delete", "Delete this location", () -> deleteOne(location));
+		JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		actions.setOpaque(false);
+		actions.add(pin);
+		actions.add(dot());
+		actions.add(map);
+		actions.add(dot());
+		actions.add(delete);
+
+		JPanel text = PanelStyle.column(2);
 		text.add(name);
+		text.add(ref);
+		text.add(actions);
 
-		JLabel reference = new JLabel(LocationDisplay.reference(location, gridSize));
-		reference.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		text.add(reference);
-
-		JCheckBox select = new JCheckBox();
-		select.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		select.setToolTipText("Select for bulk delete");
-		select.setSelected(selectedKeys.contains(LocationEdits.placeKey(location)));
-		select.addActionListener(event -> setSelected(location, select.isSelected()));
-
-		row.add(select, BorderLayout.WEST);
+		JPanel row = new JPanel(new BorderLayout(4, 0));
+		row.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		row.setBorder(new EmptyBorder(7, 8, 7, 8));
+		JPanel tick = new JPanel(new BorderLayout());
+		tick.setOpaque(false);
+		tick.add(select, BorderLayout.NORTH);
+		tick.setBorder(new EmptyBorder(1, 0, 0, 4));
+		row.add(tick, BorderLayout.WEST);
 		row.add(text, BorderLayout.CENTER);
-		row.add(createRowButtons(location), BorderLayout.EAST);
-		return row;
-	}
-
-	private JPanel createRowButtons(SavedLocation location)
-	{
-		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-		JButton pin = compactButton(location.isPinned() ? "Pinned" : "Pin",
-			location.isPinned()
-				? "Remove this location's world map pin"
-				: "Show this location on the world map");
-		// A lit background rather than a tick, so the pin never reads as a selection
-		// checkbox sitting next to it.
-		pin.setBackground(location.isPinned()
-			? ColorScheme.BRAND_ORANGE
-			: ColorScheme.DARK_GRAY_COLOR);
-		pin.addActionListener(event -> togglePinned(location));
-		buttons.add(pin);
-
-		JButton showOnMap = compactButton("Map", "Centre the world map here");
-		showOnMap.addActionListener(event -> showOnMap(location));
-		buttons.add(showOnMap);
-
-		JButton delete = compactButton("X", "Delete this location");
-		delete.addActionListener(event -> deleteOne(location));
-		buttons.add(delete);
-
-		return buttons;
-	}
-
-	private JButton compactButton(String text, String tooltip)
-	{
-		JButton button = new JButton(text);
-		button.setToolTipText(tooltip);
-		button.setFocusPainted(false);
-		button.setMargin(new Insets(2, 4, 2, 4));
-		button.setPreferredSize(new Dimension(text.length() > 1 ? 8 + text.length() * 7 : 24, 22));
-		return button;
+		return PanelStyle.fixedHeight(row);
 	}
 
 	private void setSelected(SavedLocation location, boolean selected)
@@ -262,25 +349,19 @@ public class WorldGridPanel extends PluginPanel
 		updateSelectionControls(repository.getLocations());
 	}
 
-	private void toggleSelectAll()
+	private void toggleSelectAll(boolean on)
 	{
-		if (selectAll.isSelected())
-		{
-			selectedKeys = LocationEdits.allKeys(repository.getLocations());
-		}
-		else
-		{
-			selectedKeys = new LinkedHashSet<>();
-		}
+		selectedKeys = on ? LocationEdits.allKeys(repository.getLocations()) : new LinkedHashSet<>();
 		rebuild();
 	}
 
 	private void updateSelectionControls(List<SavedLocation> locations)
 	{
-		deleteSelected.setText("Delete selected (" + selectedKeys.size() + ")");
-		deleteSelected.setEnabled(!selectedKeys.isEmpty());
+		deleteSelected.setText(selectedKeys.isEmpty() ? "Delete selected" : "Delete " + selectedKeys.size() + " selected");
+		PanelStyle.enable(deleteSelected, !selectedKeys.isEmpty());
 		selectAll.setEnabled(!locations.isEmpty());
-		selectAll.setSelected(!locations.isEmpty() && selectedKeys.size() == locations.size());
+		selectAll.setTicked(!locations.isEmpty() && selectedKeys.size() == locations.size());
+		selectAllLabel.setForeground(locations.isEmpty() ? ColorScheme.MEDIUM_GRAY_COLOR : PanelStyle.MUTED);
 	}
 
 	private void deleteSelected()
